@@ -1,1 +1,4 @@
-pytorch-ood==0.0.15
+pytorch-ood==0.1.2
+tqdm
+torchvision
+torch

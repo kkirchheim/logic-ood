@@ -1,8 +1,8 @@
-# Robust Anomaly Detection with Logical Reasoning  
+# Robust Anomaly Detection with Logical Reasoning
 
 <img src="/img/safecomp.pdf"></img>
-                           
-## Setup 
+
+## Setup
 
 
 ```
@@ -13,10 +13,9 @@ conda install pandas seaborn tqdm scikit-learn
 
 ### Prolog (Optional)
 
-To run the actual Prolog knowledge base, you will have to install swi-prolog. 
+To run the actual Prolog engine, you will have to install swi-prolog.
 
 ```sh
 sudo apt install swi-prolog
 pip install -U pyswip
 ```
-
