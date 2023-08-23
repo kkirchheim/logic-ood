@@ -1,11 +1,13 @@
 from typing import List
 
 import torch
+from torch.utils.data import DataLoader
 
 # local
 from primatenet import PrimateNet
 from pytorch_ood.api import Detector
 from pytorch_ood.detector import MaxSoftmax
+from pytorch_ood.utils import extract_features
 from torch import Tensor
 
 
@@ -253,13 +255,13 @@ class PrimateNetLogicDetector(Detector):
 
         return scores * consistent
 
+    @torch.no_grad()
     def predict(self, x):
         features = []
 
-        for model in zip(self.models):
-            with torch.no_grad():
-                z = model(x).cpu()
-                features.append(z)
+        for model in self.models:
+            z = model(x).cpu()
+            features.append(z)
 
         if self.oe_net is not None:
             oe_features = self.oe_net(x)
@@ -268,8 +270,18 @@ class PrimateNetLogicDetector(Detector):
 
         return self.predict_features(features, oe_features)
 
-    def fit(self, *args, **kwargs):
-        pass
+    def fit(self, loader: DataLoader, device="cpu"):
+
+        zs = []
+        ys = []
+
+        for model in self.models:
+            z, y = extract_features(loader, model, device=device)
+            zs.append(z)
+            ys.append(y)
+
+        for i, (z, y) in enumerate(zip(zs, ys)):
+            self.detectors[i].fit_features(z, y)
 
     def fit_features(self, *args, **kwargs):
         pass

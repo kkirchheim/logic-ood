@@ -1,9 +1,10 @@
 """
-Contains some detectos specifically designed for the ... dataset
+Contains some detectors specifically designed for the GTSR dataset
 """
-
-import numpy as np
 import torch
+from pytorch_ood.detector import TemperatureScaling
+from pytorch_ood.utils import extract_features
+from torch import Tensor
 from pyswip import Prolog
 from pytorch_ood.api import Detector
 from torch import nn
@@ -36,7 +37,7 @@ class EnsembleDetector(Detector):
         pass
 
 
-class LogicOnlyDetector(Detector):
+class LogicOOD(Detector):
     def __init__(
         self,
         label_net: nn.Module,
@@ -45,120 +46,98 @@ class LogicOnlyDetector(Detector):
         class_to_shape: dict,
         class_to_color: dict,
         sign_net: nn.Module = None,
+        rotation_net: nn.Module = None,
     ):
         self.label_net = label_net
         self.shape_net = shape_net
         self.color_net = color_net
         self.sign_net = sign_net
+        self.rotation_net = rotation_net
+
         self.class_to_shape = class_to_shape
         self.class_to_color = class_to_color
 
     def fit_features(self, x):
         pass
 
-    def predict_features(self, x):
-        pass
+    def predict_features(self, x: Tensor) -> Tensor:
+        raise ValueError
 
-    def predict(self, x):
-        l = self.label_net(x)
-        s = self.shape_net(x)
-        c = self.color_net(x)
+    @torch.no_grad()
+    def get_predictions(self, x):
 
-        labels = l.max(dim=1).indices
-        shapes_expected = torch.tensor([self.class_to_shape[c.item()] for c in labels])
-        colors_expected = torch.tensor([self.class_to_color[c.item()] for c in labels])
+        results = {
+            "label": self.label_net(x).cpu(),
+            "shape": self.shape_net(x).cpu(),
+            "color": self.color_net(x).cpu(),
+        }
 
-        shapes_detected = s.max(dim=1).indices.cpu()
-        colors_detected = c.max(dim=1).indices.cpu()
-
-        s1 = l.softmax(dim=1).max(dim=1).values.cpu()
-        s2 = s.softmax(dim=1).max(dim=1).values.cpu()
-        s3 = c.softmax(dim=1).max(dim=1).values.cpu()
-
-        # shield outlier score
         if self.sign_net:
-            o = self.sign_net(x)
-            sign_expected = torch.ones(size=(labels.shape[0],))
-            sign_detected = o.argmax(dim=1).cpu()
-            consistent = (
-                (shapes_detected == shapes_expected)
-                & (colors_expected == colors_detected)
-                & (sign_expected == sign_detected)
-            )
-        else:
-            consistent = (shapes_detected == shapes_expected) & (
-                colors_expected == colors_detected
-            )
+            results["sign"] = self.sign_net(x).cpu()
 
-        return (1 - consistent.long()).float()
+        if self.rotation_net:
+            results["rotation"] = self.rotation_net(x).cpu()
+
+        return results
+
+    @torch.no_grad()
+    def consistent(self, x, return_predictions=False):
+        """
+        Determines of the predictions are consistent with the domain knowledge
+        """
+        p = self.get_predictions(x)
+
+        labels = p["label"].max(dim=1).indices
+        shape = torch.tensor([self.class_to_shape[c.item()] for c in labels])
+        color = torch.tensor([self.class_to_color[c.item()] for c in labels])
+
+        shape_hat = p["shape"].max(dim=1).indices.cpu()
+        color_hat = p["color"].max(dim=1).indices.cpu()
+
+        consistent = (shape_hat == shape) & (color == color_hat)
+
+        if "sign" in p:
+            sign_hat = p["sign"]
+            consistent = consistent & (sign_hat.argmax(dim=1) == 1)
+
+        if "rotation" in p:
+            rotation_hat = p["rotation"]
+            consistent = consistent & (rotation_hat.argmax(dim=1) == 0)
+
+        if return_predictions:
+            return consistent, p
+
+        return -consistent.float()
+
+    @torch.no_grad()
+    def predict(self, x):
+        consistent, p = self.consistent(x, return_predictions=True)
+
+        values = []
+
+        for key, value in p.items():
+            conf = value.softmax(dim=1).max(dim=1).values.cpu()
+            # print(f"{conf.shape=}")
+            values.append(conf)
+
+        if "sign" in p:
+            values.append(p["sign"].softmax(dim=1).max(dim=1).values.cpu())
+
+        if "rotation" in p:
+            values.append(p["rotation"].softmax(dim=1).max(dim=1).values.cpu())
+
+        scores = torch.stack(values, dim=1).mean(dim=1)
+        return -scores * consistent.float()
 
     def fit(self, *args, **kwargs):
         pass
 
 
-class SemanticDetector(Detector):
-    def __init__(
-        self,
-        label_net: nn.Module,
-        shape_net: nn.Module,
-        color_net: nn.Module,
-        class_to_shape: dict,
-        class_to_color: dict,
-        sign_net: nn.Module = None,
-    ):
-        self.label_net = label_net
-        self.shape_net = shape_net
-        self.color_net = color_net
-        self.sign_net = sign_net
-        self.class_to_shape = class_to_shape
-        self.class_to_color = class_to_color
+class PrologOOD(Detector):
+    """
+    Logic OOD with actual knowledge base
+    """
 
-    def fit_features(self, x):
-        pass
-
-    def predict_features(self, x):
-        pass
-
-    def predict(self, x):
-        l = self.label_net(x)
-        s = self.shape_net(x)
-        c = self.color_net(x)
-
-        labels = l.max(dim=1).indices
-        shapes_expected = torch.tensor([self.class_to_shape[c.item()] for c in labels])
-        colors_expected = torch.tensor([self.class_to_color[c.item()] for c in labels])
-
-        shapes_detected = s.max(dim=1).indices.cpu()
-        colors_detected = c.max(dim=1).indices.cpu()
-
-        s1 = l.softmax(dim=1).max(dim=1).values.cpu()
-        s2 = s.softmax(dim=1).max(dim=1).values.cpu()
-        s3 = c.softmax(dim=1).max(dim=1).values.cpu()
-
-        # shield outlier score
-        if self.sign_net:
-            o = self.sign_net(x)
-            sign_expected = torch.ones(size=(labels.shape[0],))
-            sign_detected = o.argmax(dim=1).cpu()
-            s4 = o.softmax(dim=1)[:, 1].cpu()  # TODO: assume 1 is shieled class
-            v = torch.stack([s1, s2, s3, s4], dim=1).mean(dim=1)
-            scores = (
-                (shapes_detected == shapes_expected)
-                & (colors_expected == colors_detected)
-                & (sign_expected == sign_detected)
-            )
-        else:
-            v = torch.stack([s1, s2, s3], dim=1).mean(dim=1)
-            scores = (shapes_detected == shapes_expected) & (colors_expected == colors_detected)
-
-        scores = -v * scores.float()
-        return scores
-
-    def fit(self, *args, **kwargs):
-        pass
-
-
-class KBDetector(Detector):
     def __init__(
         self,
         kb: str,
@@ -167,19 +146,17 @@ class KBDetector(Detector):
         color_net: nn.Module,
         label_file="data/GTSRB/labels.txt",
         sign_net: nn.Module = None,
-        debug=False,
     ):
         self.kb = Prolog()
         self.kb.consult(kb)
-        self.count = 0
         self.label_net = label_net
         self.shape_net = shape_net
         self.color_net = color_net
         self.sign_net = sign_net
-        self.debug = debug
 
         self.shape_to_name = ("triangle", "circle", "square", "octagon", "inverse_triange")
         self.color_to_name = ("red", "blue", "yellow", "white")
+        self.sign_to_name = ("false", "true")
 
         with open(label_file, "r") as f:
             self.label_to_name = [
@@ -200,59 +177,139 @@ class KBDetector(Detector):
         if self.sign_net:
             signs_conf, signs = self.sign_net(x).softmax(dim=1).cpu().max(dim=1)
         else:
-            signs = torch.ones(size=(x.shape[0],)).long()
+            signs = torch.ones(size=(x.shape[0],)).bool()
             signs_conf = torch.ones(size=(x.shape[0],)).float()
 
-        for label, shape, color, sign, o in zip(labels, shapes, colors, signs, x):
-            # print(label)
-            var = f"x{self.count:06d}"  # name for new variable
-
+        for label, shape, color, sign in zip(labels, shapes, colors, signs):
             nlabel = self.label_to_name[label.item() - 1]
             nshape = self.shape_to_name[shape.item()]
             ncolor = self.color_to_name[color.item()]
+            is_sign = self.sign_to_name[sign]
 
-            self.kb.assertz(f"has_shape({var}, {nshape})")
-            self.kb.assertz(f"has_color({var}, {ncolor})")
-            self.kb.assertz(f"has_label({var}, {nlabel})")
+            query = f"is_sat({nlabel}, {ncolor}, {nshape}, 0, {is_sign})"
 
-            if sign > 0:
-                self.kb.assertz(f"sign({var})")
-
-            response = list(self.kb.query(f"consistent({var})", maxresult=1))
+            response = list(self.kb.query(query))  # , maxresult=1
             if bool(response):
                 r = 1.0
             else:
                 r = 0.0
 
-            if self.debug:
-                print("-----------------------------")
-                print(f"has_shape({var}, {nshape}) [{shape.item()}]")
-                print(f"has_color({var}, {ncolor}) [{color.item()}]")
-                print(f"has_label({var}, {nlabel}) [{label.item()}]")
-                if sign > 0:
-                    print(f"sign({var}) [{sign.item()}]")
-                else:
-                    print(f"not a sign({var}) [{sign.item()}]")
-
-                if r == 1.0:
-                    print("consistent")
-                else:
-                    print("NOT consistent")
-                # plt.imshow(np.moveaxis(o.cpu().numpy(), 0, -1))
-                # plt.show()
-                print("-----------------------------")
-
-            self.count += 1
             results.append(r)
 
         valid = torch.tensor(results).cpu()
         scores = (
+            # TODO: we included signs conf
             torch.stack([labels_conf, shapes_conf, colors_conf, signs_conf], dim=1)
             .mean(dim=1)
             .cpu()
         )
 
         return -valid * scores
+
+    def fit_features(self, x):
+        pass
+
+    def predict_features(self, x):
+        pass
+
+
+class PrologOODT(Detector):
+    """
+    Logic OOD with actual knowledge base and Temperature scaling
+    """
+
+    def __init__(
+        self,
+        kb: str,
+        label_net: nn.Module,
+        shape_net: nn.Module,
+        color_net: nn.Module,
+        label_file="data/GTSRB/labels.txt",
+        sign_net: nn.Module = None,
+    ):
+        self.kb = Prolog()
+        self.kb.consult(kb)
+        self.label_net = label_net
+        self.shape_net = shape_net
+        self.color_net = color_net
+        self.sign_net = sign_net
+
+        self.shape_to_name = ("triangle", "circle", "square", "octagon", "inverse_triange")
+        self.color_to_name = ("red", "blue", "yellow", "white")
+        self.sign_to_name = ("false", "true")
+
+        with open(label_file, "r") as f:
+            self.label_to_name = [
+                a.strip("'\n").replace(" ", "_").replace("(", "").replace(")", "")
+                for a in f.readlines()
+            ]
+
+        self.scorer_label = TemperatureScaling(self.label_net)
+        self.scorer_color = TemperatureScaling(self.color_net)
+        self.scorer_shape = TemperatureScaling(self.shape_net)
+
+    def fit(self, loader_label, loader_color, loader_shape, device):
+        print("Fitting with temperature scaling")
+        logits_label, y1 = extract_features(loader_label, self.label_net, device)
+        logits_color, y2 = extract_features(loader_color, self.color_net, device)
+        logits_shape, y3 = extract_features(loader_shape, self.shape_net, device)
+
+        print(f"label: {y1.unique()=} {logits_label.shape=}")
+        self.scorer_label.fit_features(logits_label, labels=y1)
+
+        print(f"color: {y2.unique()=} {logits_color.shape=}")
+        self.scorer_color.fit_features(logits_color, labels=y2)
+
+        print(f"shape: {y3.unique()=} {logits_shape.shape=}")
+        self.scorer_shape.fit_features(logits_shape, labels=y3)
+
+        print(f"{self.scorer_label.t=}")
+        print(f"{self.scorer_color.t=}")
+        print(f"{self.scorer_shape.t=}")
+
+    def predict(self, x) -> torch.tensor:
+        results = []
+
+        _, labels = self.label_net(x).softmax(dim=1).cpu().max(dim=1)
+        _, shapes = self.shape_net(x).softmax(dim=1).cpu().max(dim=1)
+        _, colors = self.color_net(x).softmax(dim=1).cpu().max(dim=1)
+
+        labels_conf = self.scorer_label(x).cpu()
+        colors_conf = self.scorer_color(x).cpu()
+        shapes_conf = self.scorer_shape(x).cpu()
+
+        if self.sign_net:
+            signs_conf, signs = self.sign_net(x).softmax(dim=1).cpu().max(dim=1)
+        else:
+            signs = torch.ones(size=(x.shape[0],)).bool()
+            # signs_conf = torch.ones(size=(x.shape[0],)).float()
+
+        for label, shape, color, sign in zip(labels, shapes, colors, signs):
+            nlabel = self.label_to_name[label.item() - 1]
+            nshape = self.shape_to_name[shape.item()]
+            ncolor = self.color_to_name[color.item()]
+            is_sign = self.sign_to_name[sign]
+
+            query = f"is_sat({nlabel}, {ncolor}, {nshape}, 0, {is_sign})"
+
+            response = list(self.kb.query(query))
+            if bool(response):
+                r = 1.0
+            else:
+                r = 0.0
+
+            results.append(r)
+
+        valid = torch.tensor(results).cpu()
+        scores = (
+            # TODO: we included signs conf
+            torch.stack([labels_conf, shapes_conf, colors_conf], dim=1)
+            .mean(dim=1)
+            .cpu()
+        )
+
+        # no negative
+        return valid * scores
 
     def fit_features(self, x):
         pass

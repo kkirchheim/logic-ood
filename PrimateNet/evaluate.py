@@ -24,10 +24,11 @@ def fit(models, oe_model, device, cache):
     label_net = models[0]
 
     detectors = {
-        "Logic-based": PrimateNetLogicDetector(models),
-        "Logic-based-OE": PrimateNetLogicDetector(models, oe_model=oe_model),
-        "Logic-only": PrimateNetLogicOnlyDetector(models),
-        "Logic-only-OE": PrimateNetLogicOnlyDetector(models, oe_model=oe_model),
+        "CalLogicOOD": PrimateNetLogicDetector(models),
+        "LogicOOD": PrimateNetLogicDetector(models),
+        "LogicOOD+": PrimateNetLogicDetector(models, oe_model=oe_model),
+        "Logic": PrimateNetLogicOnlyDetector(models),
+        "Logic+": PrimateNetLogicOnlyDetector(models, oe_model=oe_model),
         "Ensemble": EnsembleDetector([MaxSoftmax(model) for model in models]),
         "MSP": MaxSoftmax(label_net),
         "Energy": EnergyBased(label_net),

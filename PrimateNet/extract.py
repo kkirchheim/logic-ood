@@ -7,7 +7,15 @@ from os.path import join
 import click
 import torch
 from primatenet import PrimateNet
-from pytorch_ood.dataset.img import FoolingImages, ImageNetA, ImageNetO, ImageNetR, Textures
+from pytorch_ood.dataset.img import (
+    FoolingImages,
+    ImageNetA,
+    ImageNetO,
+    ImageNetR,
+    Textures,
+    NINCO,
+    iNaturalist,
+)
 from pytorch_ood.utils import ToUnknown, fix_random_seed
 from torch.utils.data import DataLoader
 from train import eval_acc
@@ -25,6 +33,7 @@ def patch_models(models, oe_model):
     oe_model.myfeatures = partial(myfeatures, oe_model)
 
 
+@torch.no_grad()
 def extract(models, oe_model, device, imagenet_root, dataset_root) -> ResultCache:
     for model in models:
         model.eval()
@@ -33,7 +42,10 @@ def extract(models, oe_model, device, imagenet_root, dataset_root) -> ResultCach
 
     extract_train(cache, models[0], device, imagenet_root)
 
-    datasets = {d.__name__: d for d in (FoolingImages, Textures, ImageNetO, ImageNetR, ImageNetA)}
+    datasets = {
+        d.__name__: d
+        for d in (FoolingImages, Textures, ImageNetO, ImageNetR, ImageNetA, NINCO, iNaturalist)
+    }
     data_in = PrimateNet(
         root=imagenet_root,
         transform=test_trans,
@@ -41,29 +53,29 @@ def extract(models, oe_model, device, imagenet_root, dataset_root) -> ResultCach
         target_transform=lambda y: int(y[0]),
     )
 
-    with torch.no_grad():
-        for data_name, dataset_c in datasets.items():
-            data_out = dataset_c(
-                root=dataset_root,
-                transform=test_trans,
-                target_transform=ToUnknown(),
-                download=True,
-            )
-            loader = DataLoader(
-                data_in + data_out,
-                batch_size=64,
-                shuffle=False,
-                worker_init_fn=fix_random_seed,
-            )
+    for data_name, dataset_c in datasets.items():
+        data_out = dataset_c(
+            root=dataset_root,
+            transform=test_trans,
+            target_transform=ToUnknown(),
+            download=True,
+        )
+        loader = DataLoader(
+            data_in + data_out,
+            batch_size=64,
+            shuffle=False,
+            worker_init_fn=fix_random_seed,
+            num_workers=12,
+        )
 
-            print("Extracting logits from all models")
-            extract_logits(cache, data_name, device, loader, models)
+        print("Extracting logits from all models")
+        extract_logits(cache, data_name, device, loader, models)
 
-            print("Extracting OE Logits")
-            extract_oe_logits(cache, data_name, device, loader, oe_model)
+        print("Extracting OE Logits")
+        extract_oe_logits(cache, data_name, device, loader, oe_model)
 
-            print("Extracting deep features")
-            extract_deep_features(cache, models[0], data_name, device, loader)
+        print("Extracting deep features")
+        extract_deep_features(cache, models[0], data_name, device, loader)
 
     return cache
 

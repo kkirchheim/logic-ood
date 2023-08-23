@@ -2,3 +2,6 @@ pytorch-ood==0.1.2
 tqdm
 torchvision
 torch
+
+# different versions crash
+# pyswip==0.2.9

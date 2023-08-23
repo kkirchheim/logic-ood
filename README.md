@@ -1,6 +1,9 @@
-# Robust Anomaly Detection with Logical Reasoning
 
-<img src="/img/safecomp.pdf"></img>
+
+<h1 style="text-align: center">Out-of-Distribution Detection <br>with Logical Reasoning</h1>
+
+<img width=75% src="img/architecture.png" style="display: block;  margin-left: auto; margin-right: auto;"/>
+
 
 ## Setup
 
@@ -11,11 +14,13 @@ pip install -U pytorch-ood
 conda install pandas seaborn tqdm scikit-learn
 ```
 
-### Prolog (Optional)
+### Prolog Inference Engine (Optional)
 
 To run the actual Prolog engine, you will have to install swi-prolog.
 
+**Ubuntu**
+
 ```sh
 sudo apt install swi-prolog
-pip install -U pyswip
+pip install -U pyswip==0.2.9
 ```

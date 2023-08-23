@@ -65,10 +65,26 @@ def myfeatures(self, x):
     """
     Custom forward method for models
     """
-    x = self.features(x)
+    # See note [TorchScript super()]
+    # resnet
+    x = self.conv1(x)
+    x = self.bn1(x)
+    x = self.relu(x)
+    x = self.maxpool(x)
+
+    x = self.layer1(x)
+    x = self.layer2(x)
+    x = self.layer3(x)
+    x = self.layer4(x)
 
     x = self.avgpool(x)
     x = torch.flatten(x, 1)
+
+    # efficientnet
+    # x = self.features(x)
+    #
+    # x = self.avgpool(x)
+    # x = torch.flatten(x, 1)
     return x
 
 
@@ -77,9 +93,11 @@ def load_all_models(root: str):
     print(f"Loading models from {root}")
     models = []
     for i, att in enumerate(PrimateNet.attributes):
-        print(f"Loading model for {att}")
-        model = torch.load(join(root, f"model-{att}.pt"))
+        p = join(root, f"model-{att}.pt")
+        print(f"Loading model for {att} from {p}")
+        model = torch.load(p)
         models.append(model)
+        print(f"FC: {model.fc.weight.shape}")
 
     print("Loading model for oe")
     oe_model = torch.load(join(root, "model-oe.pt"))

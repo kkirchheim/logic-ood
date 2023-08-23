@@ -11,7 +11,7 @@ from pytorch_ood.utils import fix_random_seed
 from torch import nn
 from torch.optim import SGD
 from torch.utils.data import DataLoader
-from torchvision.models import EfficientNet_V2_L_Weights, efficientnet_v2_l
+from torchvision.models import EfficientNet_V2_L_Weights, efficientnet_v2_l, resnet50
 from tqdm import tqdm
 from utils import test_trans, trans
 
@@ -64,9 +64,18 @@ def train_model(att_index, num_classes, epochs, imagenet_root, device, batch_siz
         worker_init_fn=fix_random_seed,
     )
 
-    model = efficientnet_v2_l(weights=EfficientNet_V2_L_Weights.DEFAULT)
-    model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_classes)
-    model.fc = model.classifier[1]
+    model = resnet50(num_classes=1000)
+    d = torch.load("/home/kirchheim/model_best.pth.tar")["state_dict"]
+    newd = {}
+    for key, value in d.items():
+        newd[key.replace("module.", "")] = value
+    model.load_state_dict(newd)
+
+    model.fc = nn.Linear(in_features=model.fc.in_features, out_features=num_classes)
+
+    # model = efficientnet_v2_l(weights=EfficientNet_V2_L_Weights.DEFAULT)
+    # model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_classes)
+    # model.fc = model.classifier[1]
 
     _ = model.to(device)
 
@@ -137,9 +146,18 @@ def train_oe_model(epochs, device, imagenet_root, batch_size=16, lr=0.001):
         worker_init_fn=fix_random_seed,
     )
 
-    model = efficientnet_v2_l(weights=EfficientNet_V2_L_Weights.DEFAULT)
-    model.classifier[1] = nn.Linear(model.classifier[1].in_features, 2)  # binary
-    model.fc = model.classifier[1]
+    model = resnet50(num_classes=1000)
+    d = torch.load("/home/kirchheim/model_best.pth.tar")["state_dict"]
+    newd = {}
+    for key, value in d.items():
+        newd[key.replace("module.", "")] = value
+    model.load_state_dict(newd)
+
+    model.fc = nn.Linear(in_features=model.fc.in_features, out_features=2)
+
+    # model = efficientnet_v2_l(weights=EfficientNet_V2_L_Weights.DEFAULT)
+    # model.classifier[1] = nn.Linear(model.classifier[1].in_features, 2)  # binary
+    # model.fc = model.classifier[1]
 
     _ = model.to(device)
 
