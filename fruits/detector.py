@@ -1,11 +1,11 @@
 """
-Contains some detectors specifically designed for the GTSR dataset
+Contains some detectors specifically designed for the Fruits dataset
 """
 import torch
 from torch import Tensor
 from pyswip import Prolog
 from pytorch_ood.api import Detector
-from pytorch_ood.utils import TensorBuffer, extract_features
+from pytorch_ood.utils import extract_features
 from pytorch_ood.detector import TemperatureScaling
 from torch import nn
 

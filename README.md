@@ -1,8 +1,10 @@
 
-
-<h1 style="text-align: center">Out-of-Distribution Detection <br>with Logical Reasoning</h1>
+<div align="center">
+<h1>Out-of-Distribution Detection <br>with Logical Reasoning</h1>
 
 <img width=75% src="img/architecture.png" style="display: block;  margin-left: auto; margin-right: auto;"/>
+
+</div>
 
 
 ## Setup
@@ -14,7 +16,7 @@ pip install -U pytorch-ood
 conda install pandas seaborn tqdm scikit-learn
 ```
 
-### Prolog Inference Engine (Optional)
+### Prolog Inference Engine
 
 To run the actual Prolog engine, you will have to install swi-prolog.
 
@@ -24,3 +26,7 @@ To run the actual Prolog engine, you will have to install swi-prolog.
 sudo apt install swi-prolog
 pip install -U pyswip==0.2.9
 ```
+
+## Experiments
+
+Results for experiments can be found in the corresponding subdirectories.
