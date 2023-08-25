@@ -54,7 +54,7 @@ def train_model(att_index, num_classes, epochs, imagenet_root, device, batch_siz
     train a model for the given attribute index
     """
     train_data = PrimateNet(root=imagenet_root, transform=trans, train=True)
-    test_data = PrimateNet(root=imagenet_root, transform=test_trans, train=False)
+    # test_data = PrimateNet(root=imagenet_root, transform=test_trans, train=False)
 
     train_loader = DataLoader(
         train_data,
@@ -65,6 +65,7 @@ def train_model(att_index, num_classes, epochs, imagenet_root, device, batch_siz
     )
 
     model = resnet50(num_classes=1000)
+    print(f"Features: {model.fc.in_features}")
     d = torch.load("/home/kirchheim/model_best.pth.tar")["state_dict"]
     newd = {}
     for key, value in d.items():
@@ -100,7 +101,7 @@ def train_model(att_index, num_classes, epochs, imagenet_root, device, batch_siz
             loss.backward()
             optimizer.step()
 
-            running_loss = 0.8 * running_loss + 0.2 * loss.item()
+            running_loss = 0.95 * running_loss + 0.05 * loss.item()
             bar.set_postfix({"loss": running_loss})
 
         scheduler.step()
@@ -147,6 +148,7 @@ def train_oe_model(epochs, device, imagenet_root, batch_size=16, lr=0.001):
     )
 
     model = resnet50(num_classes=1000)
+    print(f"Features: {model.fc.in_features}")
     d = torch.load("/home/kirchheim/model_best.pth.tar")["state_dict"]
     newd = {}
     for key, value in d.items():
@@ -182,7 +184,7 @@ def train_oe_model(epochs, device, imagenet_root, batch_size=16, lr=0.001):
             loss.backward()
             optimizer.step()
 
-            running_loss = 0.8 * running_loss + 0.2 * loss.item()
+            running_loss = 0.95 * running_loss + 0.05 * loss.item()
             bar.set_postfix({"loss": running_loss})
 
         scheduler.step()
@@ -220,6 +222,7 @@ def main(device, dataset_root, imagenet_root, n_epochs, n_runs, lr, batch_size):
     Train models
     """
     for seed in range(n_runs):
+        print(f"Running for seed {seed}")
         oe_model = train_oe_model(
             epochs=n_epochs,
             device=device,
@@ -229,8 +232,10 @@ def main(device, dataset_root, imagenet_root, n_epochs, n_runs, lr, batch_size):
         )
         root = join(dataset_root, "models", f"{seed}")
         os.makedirs(root, exist_ok=True)
-        print(f"Saving to {root}")
-        torch.save(oe_model.cpu(), join(root, "model-oe.pt"))
+        p = join(root, "model-oe.pt")
+        print(f"Saving to {p}")
+        torch.save(oe_model.cpu(), p)
+        print(f"FC: {oe_model.fc.weight.shape}")
 
         for i, att in enumerate(PrimateNet.attributes):
             print(f"Training model for {att}")
@@ -248,11 +253,13 @@ def main(device, dataset_root, imagenet_root, n_epochs, n_runs, lr, batch_size):
                 lr=lr,
             )
 
-            root = join(dataset_root, "models", f"{seed}")
-            os.makedirs(root, exist_ok=True)
+            # root = join(dataset_root, "models", f"{seed}")
+            # os.makedirs(root, exist_ok=True)
 
-            print(f"Saving to {root}")
-            torch.save(model.cpu(), join(root, f"model-{att}.pt"))
+            p = join(root, f"model-{att}.pt")
+            print(f"Saving to {p}")
+            torch.save(model.cpu(), p)
+            print(f"FC: {model.fc.weight.shape}")
 
 
 if __name__ == "__main__":

@@ -85,6 +85,7 @@ def extract_deep_features(cache, model, data_name, device, loader):
     for x, y in loader:
         deep_features.append(model.myfeatures(x.to(device)))
     deep_features = torch.cat(deep_features, dim=0).to(device)
+    print(f"{deep_features.shape=}")
     cache.dataset_features[data_name] = deep_features
 
 
@@ -108,6 +109,7 @@ def extract_logits(cache, data_name, device, loader, models):
             ys.append(y.to(device))
         logits, ys = torch.cat(logits, dim=0).to(device), torch.cat(ys, dim=0).to(device)
 
+        print(f"{logits.shape=}")
         all_logits.append(logits)
         labels.append(ys)
     # update cache

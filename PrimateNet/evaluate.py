@@ -7,7 +7,15 @@ import click
 import pandas as pd
 import torch
 from detectors import EnsembleDetector, PrimateNetLogicDetector, PrimateNetLogicOnlyDetector
-from pytorch_ood.detector import EnergyBased, Entropy, Mahalanobis, MaxLogit, MaxSoftmax, ViM
+from pytorch_ood.detector import (
+    EnergyBased,
+    Entropy,
+    Mahalanobis,
+    MaxLogit,
+    MaxSoftmax,
+    ViM,
+    ReAct,
+)
 from pytorch_ood.utils import OODMetrics, fix_random_seed
 from utils import ResultCache, load_all_models, patch_models
 
@@ -24,12 +32,12 @@ def fit(models, oe_model, device, cache):
     label_net = models[0]
 
     detectors = {
-        "CalLogicOOD": PrimateNetLogicDetector(models),
         "LogicOOD": PrimateNetLogicDetector(models),
         "LogicOOD+": PrimateNetLogicDetector(models, oe_model=oe_model),
         "Logic": PrimateNetLogicOnlyDetector(models),
         "Logic+": PrimateNetLogicOnlyDetector(models, oe_model=oe_model),
         "Ensemble": EnsembleDetector([MaxSoftmax(model) for model in models]),
+        "ReAct": ReAct(lambda x: x, label_net.fc),
         "MSP": MaxSoftmax(label_net),
         "Energy": EnergyBased(label_net),
         "Mahalanobis": Mahalanobis(label_net.myfeatures, eps=0),
@@ -74,14 +82,16 @@ def evaluate(cache, detectors, device):
 
             # evaluate
             for detector_name, detector in detectors.items():
-                print(f"{data_name} - {detector_name}")
-                if detector_name in ["ViM", "Mahalanobis"]:
+                print(f"OOD Detection for {detector_name}/{data_name}")
+                if detector_name in ["ReAct"]:
+                    scores = detector.predict(deep_features)
+                elif detector_name in ["ViM", "Mahalanobis"]:
                     scores = detector.predict_features(deep_features)
 
-                elif detector_name in ["Logic-based", "Ensemble", "Logic-only"]:
+                elif detector_name in ["Logic", "LogicOOD", "Ensemble"]:
                     scores = detector.predict_features(all_logits)
 
-                elif detector_name in ["Logic-based-OE", "Logic-only-OE"]:
+                elif detector_name in ["Logic+", "LogicOOD+"]:
                     scores = detector.predict_features(all_logits, oe_features=oe_logits)
 
                 else:
@@ -105,7 +115,8 @@ def main(device, dataset_root, n_runs):
     results = []
 
     for seed in range(n_runs):
-        models, oe_model = load_all_models(dataset_root)
+        root = join(dataset_root, "models", str(seed))
+        models, oe_model = load_all_models(root)
 
         for i, model in enumerate(models):
             model.to(device)
@@ -114,7 +125,7 @@ def main(device, dataset_root, n_runs):
 
         patch_models(models, oe_model)
 
-        cache_path = join(dataset_root, "models", f"{seed}", "cache.pt")
+        cache_path = join(root, "cache.pt")
         print(f"Loading models from {cache_path}")
         cache: ResultCache = torch.load(cache_path, map_location="cpu")
 

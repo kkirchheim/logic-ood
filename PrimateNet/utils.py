@@ -24,7 +24,7 @@ trans = ClassificationPresetTrain(
     auto_augment_policy=None,
     random_erase_prob=0.0,
     ra_magnitude=9,
-    augmix_severity=3,
+    augmix_severity=0,
     backend="PIL",
 )
 
