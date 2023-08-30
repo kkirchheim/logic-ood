@@ -24,7 +24,7 @@ trans = ClassificationPresetTrain(
     auto_augment_policy=None,
     random_erase_prob=0.0,
     ra_magnitude=9,
-    augmix_severity=0,
+    augmix_severity=3,
     backend="PIL",
 )
 
@@ -50,6 +50,8 @@ class ResultCache(object):
         self.dataset_oe_logits = {}
         self.dataset_labels = {}
         self.train_features = None
+        self.val_features = None
+        self.val_labels = None
         self.train_labels = None
 
     def clear(self):
@@ -58,6 +60,8 @@ class ResultCache(object):
         self.dataset_oe_logits = {}
         self.dataset_labels = {}
         self.train_features = None
+        self.val_labels = None
+        self.val_features = None
         self.train_labels = None
 
 

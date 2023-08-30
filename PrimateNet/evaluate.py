@@ -15,6 +15,7 @@ from pytorch_ood.detector import (
     MaxSoftmax,
     ViM,
     ReAct,
+    TemperatureScaling,
 )
 from pytorch_ood.utils import OODMetrics, fix_random_seed
 from utils import ResultCache, load_all_models, patch_models
@@ -34,6 +35,10 @@ def fit(models, oe_model, device, cache):
     detectors = {
         "LogicOOD": PrimateNetLogicDetector(models),
         "LogicOOD+": PrimateNetLogicDetector(models, oe_model=oe_model),
+        "T-LogicOOD": PrimateNetLogicDetector(models, detector_class=TemperatureScaling),
+        "T-LogicOOD+": PrimateNetLogicDetector(
+            models, oe_model=oe_model, detector_class=TemperatureScaling
+        ),
         "Logic": PrimateNetLogicOnlyDetector(models),
         "Logic+": PrimateNetLogicOnlyDetector(models, oe_model=oe_model),
         "Ensemble": EnsembleDetector([MaxSoftmax(model) for model in models]),
@@ -53,6 +58,16 @@ def fit(models, oe_model, device, cache):
 
     features = cache.train_features
     ys = cache.train_labels
+
+    detectors["T-LogicOOD"].fit_features(
+        [cache.val_features for _ in range(len(models))],
+        [cache.val_labels[:, i] for i in range(len(models))],
+    )
+
+    detectors["T-LogicOOD+"].fit_features(
+        [cache.val_features for m in models],
+        [cache.val_labels[:, i] for i, _ in enumerate(models)],
+    )
 
     print(features.shape, type(features))
 
@@ -88,10 +103,10 @@ def evaluate(cache, detectors, device):
                 elif detector_name in ["ViM", "Mahalanobis"]:
                     scores = detector.predict_features(deep_features)
 
-                elif detector_name in ["Logic", "LogicOOD", "Ensemble"]:
+                elif detector_name in ["Logic", "LogicOOD", "T-LogicOOD", "Ensemble"]:
                     scores = detector.predict_features(all_logits)
 
-                elif detector_name in ["Logic+", "LogicOOD+"]:
+                elif detector_name in ["Logic+", "LogicOOD+", "T-LogicOOD+"]:
                     scores = detector.predict_features(all_logits, oe_features=oe_logits)
 
                 else:
@@ -112,6 +127,9 @@ def evaluate(cache, detectors, device):
 @click.option("--dataset-root", default="../data/")
 @click.option("--n-runs", default=10)
 def main(device, dataset_root, n_runs):
+    """
+    Load cached data and calculate statistics.
+    """
     results = []
 
     for seed in range(n_runs):
@@ -126,7 +144,7 @@ def main(device, dataset_root, n_runs):
         patch_models(models, oe_model)
 
         cache_path = join(root, "cache.pt")
-        print(f"Loading models from {cache_path}")
+        print(f"Loading data from {cache_path}")
         cache: ResultCache = torch.load(cache_path, map_location="cpu")
 
         detectors = fit(models=models, oe_model=oe_model, device=device, cache=cache)

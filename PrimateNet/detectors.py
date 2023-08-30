@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 # local
 from primatenet import PrimateNet
 from pytorch_ood.api import Detector
-from pytorch_ood.detector import MaxSoftmax
+from pytorch_ood.detector import MaxSoftmax, TemperatureScaling
 from pytorch_ood.utils import extract_features
 from torch import Tensor
 
@@ -283,5 +283,6 @@ class PrimateNetLogicDetector(Detector):
         for i, (z, y) in enumerate(zip(zs, ys)):
             self.detectors[i].fit_features(z, y)
 
-    def fit_features(self, *args, **kwargs):
-        pass
+    def fit_features(self, zs, ys):
+        for i, (z, y) in enumerate(zip(zs, ys)):
+            self.detectors[i].fit_features(z, y)

@@ -12,6 +12,7 @@ from torch import nn
 from torch.optim import SGD
 from torch.utils.data import DataLoader
 from torchvision.models import EfficientNet_V2_L_Weights, efficientnet_v2_l, resnet50
+from torch.utils.data import random_split
 from tqdm import tqdm
 from utils import test_trans, trans
 
@@ -53,7 +54,11 @@ def train_model(att_index, num_classes, epochs, imagenet_root, device, batch_siz
     """
     train a model for the given attribute index
     """
-    train_data = PrimateNet(root=imagenet_root, transform=trans, train=True)
+    data = PrimateNet(root=imagenet_root, transform=trans, train=True)
+    train_data, val_data = random_split(
+        data, lengths=[20000, 800], generator=torch.Generator().manual_seed(0)
+    )
+
     # test_data = PrimateNet(root=imagenet_root, transform=test_trans, train=False)
 
     train_loader = DataLoader(

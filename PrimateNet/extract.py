@@ -17,7 +17,7 @@ from pytorch_ood.dataset.img import (
     iNaturalist,
 )
 from pytorch_ood.utils import ToUnknown, fix_random_seed
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from train import eval_acc
 from utils import ResultCache, load_all_models, myfeatures, test_trans
 
@@ -120,11 +120,11 @@ def extract_logits(cache, data_name, device, loader, models):
 
 
 def extract_train(cache, model, device, imagenet_root):
-    train_data = PrimateNet(
-        root=imagenet_root,
-        transform=test_trans,
-        target_transform=lambda y: int(y[0]),
-        train=True,
+    data = PrimateNet(
+        root=imagenet_root, transform=test_trans, train=True, target_transform=lambda y: int(y[0])
+    )
+    train_data, val_data = random_split(
+        data, lengths=[20000, 800], generator=torch.Generator().manual_seed(0)
     )
 
     train_loader = DataLoader(
@@ -145,6 +145,31 @@ def extract_train(cache, model, device, imagenet_root):
     # update cache
     cache.train_features = features
     cache.train_labels = ys
+
+    print("Extracting features for validation")
+    data = PrimateNet(root=imagenet_root, transform=test_trans, train=True)
+    _, val_data = random_split(
+        data, lengths=[20000, 800], generator=torch.Generator().manual_seed(0)
+    )
+
+    val_loader = DataLoader(
+        val_data,
+        batch_size=64,
+        shuffle=False,
+        num_workers=16,
+        worker_init_fn=fix_random_seed,
+    )
+
+    features, ys = [], []
+    for x, y in val_loader:
+        features.append(model.myfeatures(x.to(device)))
+        ys.append(y.to(device))
+    features, ys = torch.cat(features, dim=0).cpu(), torch.cat(ys, dim=0).cpu()
+
+    print(f"{features.shape=} {ys.shape=}")
+    # update cache
+    cache.val_features = features
+    cache.val_labels = ys
 
 
 @click.command()
