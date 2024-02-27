@@ -1,6 +1,18 @@
 
 <div align="center">
-<h1>Out-of-Distribution Detection <br>with Logical Reasoning</h1>
+<h1>Out-of-Distribution Detection <br> with Logical Reasoning</h1>
+
+<a href="https://openaccess.thecvf.com/content/WACV2024/html/Kirchheim_Out-of-Distribution_Detection_With_Logical_Reasoning_WACV_2024_paper.html">
+    <img alt="Template" src="https://img.shields.io/badge/Paper-WACV-0693e3?style=for-the-badge">
+</a>
+
+<a href="https://pytorch.org/get-started/locally/">
+    <img alt="PyTorch" src="https://img.shields.io/badge/PyTorch-ee4c2c?logo=pytorch&logoColor=white&style=for-the-badge">
+</a>
+<a href="https://github.com/kkirchheim/pytorch-ood">
+    <img alt="Template" src="https://img.shields.io/badge/-PyTorch--OOD-017F2F?style=for-the-badge&logo=github&labelColor=gray">
+</a>
+
 
 <img width=75% src="img/architecture.png" style="display: block;  margin-left: auto; margin-right: auto;"/>
 
