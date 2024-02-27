@@ -42,3 +42,17 @@ pip install -U pyswip==0.2.9
 ## Experiments
 
 Results for experiments can be found in the corresponding subdirectories.
+
+## Citation 
+
+If you find this work usefull, please consider citing 
+```
+@InProceedings{Kirchheim_2024_WACV,
+    author    = {Kirchheim, Konstantin and Gonschorek, Tim and Ortmeier, Frank},
+    title     = {Out-of-Distribution Detection With Logical Reasoning},
+    booktitle = {Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision (WACV)},
+    month     = {January},
+    year      = {2024},
+    pages     = {2122-2131}
+}
+```
